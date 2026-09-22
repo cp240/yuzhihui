@@ -1,0 +1,111 @@
+<title>认知知识库 · AI 驱动的自适应学习系统</title>
+
+<h1 seq="auto">项目定位与核心闭环</h1>
+<p>一个用 <b>AI 后台调度 + 间隔复习算法</b> 驱动的自适应学习系统。核心逻辑是一个持续运转的闭环：</p>
+<pre lang="text" caption="核心闭环"><code>抓最新消息 → AI(DeepSeek) 生成知识卡+选择题 → 前端学习/做题
+      ↑                                        ↓
+      └──────── 正确率·错题喂回，调整复习排期 ←──┘</code></pre>
+<ul>
+  <li><b>零依赖</b>：纯 Node.js，不需要数据库、不需要构建工具</li>
+  <li><b>先专有后白话</b>：每个术语先给严谨学术定义，再给白话比喻</li>
+  <li><b>间隔复习</b>：R1→R2→R3→R4→R5→R6，逐步拉长复习间隔</li>
+</ul>
+
+<h1 seq="auto">快速开始</h1>
+<p>按下面四步即可在本地跑通，预计几分钟完成。</p>
+
+<h2 seq="auto">环境要求</h2>
+<ul>
+  <li>Node.js 16+（推荐 20+）</li>
+  <li>一个 DeepSeek API Key（到 platform.deepseek.com 申请）</li>
+</ul>
+
+<h2 seq="auto">配置 DeepSeek Key</h2>
+<p>编辑 <code>mvp/.env</code> 文件，填入你的 key：</p>
+<pre lang="bash" caption=".env"><code>DEEPSEEK_API_KEY=sk-你的真实key
+PORT=8000</code></pre>
+
+<h2 seq="auto">启动服务</h2>
+<pre lang="bash" caption="启动命令"><code>cd mvp
+node --env-file=.env server.js</code></pre>
+<p>若 Node 版本低于 20（不支持 <code>--env-file</code>），改用：</p>
+<pre lang="bash" caption="低版本兼容"><code>export DEEPSEEK_API_KEY=sk-你的真实key
+node server.js</code></pre>
+
+<h2 seq="auto">使用</h2>
+<p>浏览器打开 <a type="url-preview" href="http://localhost:8000">http://localhost:8000</a>，即可学习、做题、触发 AI 生成。</p>
+
+<h1 seq="auto">目录结构</h1>
+<pre lang="text" caption="mvp 目录"><code>mvp/
+├── server.js        # 后端大脑（调度引擎 + DeepSeek 生成 + 反馈闭环 + 静态服务）
+├── knowledge.json   # 33 条知识点（七阶课程地图，M/F/C/T/G/P 六类）
+├── index.html       # 前端界面（调后端 API）
+├── state.json       # 学习进度持久化（运行时自动生成）
+├── .env             # 你的 DeepSeek key（已 gitignore）
+├── data.js          # ⚠️ 旧版静态页残留，可删除
+└── scheduler.js     # ⚠️ 旧版静态页残留，可删除</code></pre>
+<p><code>data.js</code> 和 <code>scheduler.js</code> 是最早“纯静态无后端”版本的遗留文件，已被 <code>server.js</code> 取代，本地开发时可直接删除。</p>
+
+<h1 seq="auto">后端 API 一览</h1>
+<table>
+  <colgroup><col width="180"/><col width="90"/><col width="400"/></colgroup>
+  <thead><tr><th><p>接口</p></th><th><p>方法</p></th><th><p>作用</p></th></tr></thead>
+  <tbody>
+    <tr><td><p><code>/api/state</code></p></td><td><p>GET</p></td><td><p>返回今日到期项、下一个新学、全量进度</p></td></tr>
+    <tr><td><p><code>/api/knowledge</code></p></td><td><p>GET</p></td><td><p>返回 33 条知识点全表</p></td></tr>
+    <tr><td><p><code>/api/learn</code></p></td><td><p>POST</p></td><td><p>标记知识点已学，进 R1 队列</p></td></tr>
+    <tr><td><p><code>/api/review</code></p></td><td><p>POST</p></td><td><p>复习反馈（忘了/记得/能讲），推进 R1-R6</p></td></tr>
+    <tr><td><p><code>/api/answer</code></p></td><td><p>POST</p></td><td><p>记录对错，答错自动提前复习 + 正确率统计</p></td></tr>
+    <tr><td><p><code>/api/generate</code></p></td><td><p>POST</p></td><td><p>原始材料 → AI 生成知识卡 + 选择题，入库</p></td></tr>
+  </tbody>
+</table>
+
+<h1 seq="auto">核心机制</h1>
+
+<h2 seq="auto">间隔复习（R1-R6）</h2>
+<p>复习间隔按固定序列推进：</p>
+<table>
+  <colgroup><col width="120"/><col width="200"/></colgroup>
+  <thead><tr><th><p>阶段</p></th><th><p>间隔</p></th></tr></thead>
+  <tbody>
+    <tr><td><p>R1</p></td><td><p>第 1 天</p></td></tr>
+    <tr><td><p>R2</p></td><td><p>第 3 天</p></td></tr>
+    <tr><td><p>R3</p></td><td><p>第 7 天</p></td></tr>
+    <tr><td><p>R4</p></td><td><p>第 16 天</p></td></tr>
+    <tr><td><p>R5</p></td><td><p>第 35 天</p></td></tr>
+    <tr><td><p>R6</p></td><td><p>第 90 天</p></td></tr>
+    <tr><td><p>长期</p></td><td><p>第 180 天</p></td></tr>
+  </tbody>
+</table>
+<p>每次复习根据反馈推进或回退：</p>
+<table>
+  <colgroup><col width="160"/><col width="450"/></colgroup>
+  <thead><tr><th><p>反馈</p></th><th><p>结果</p></th></tr></thead>
+  <tbody>
+    <tr><td><p>忘了</p></td><td><p>重置回 R1，下次明天</p></td></tr>
+    <tr><td><p>记得</p></td><td><p>推进下一档，掌握度 +1</p></td></tr>
+    <tr><td><p>能讲</p></td><td><p>跳级 + 间隔×1.5，掌握度直达“能讲”</p></td></tr>
+    <tr><td><p>答错题目</p></td><td><p>下次复习间隔减半（错题强化）</p></td></tr>
+  </tbody>
+</table>
+
+<h2 seq="auto">AI 生成规则</h2>
+<p><code>/api/generate</code> 接收一段原始材料，DeepSeek 按两条铁律输出 JSON：</p>
+<ol>
+  <li><b>先专有后白话</b>：专有名词先给严谨定义，再给白话比喻</li>
+  <li><b>不编造</b>：只基于给定材料，不杜撰数字、日期、人名</li>
+</ol>
+<p>输出字段：<code>definition</code>（专有定义）、<code>plain</code>（白话）、<code>example</code>（案例）、<code>antiIntuition</code>（反直觉点）、<code>question</code>（选择题题干）、<code>options</code>（选项）、<code>answer</code>（正确下标）。</p>
+
+<h1 seq="auto">已知边界与待办</h1>
+<ol>
+  <li><b>自动抓取网上数据</b>：DeepSeek 不联网，“抓新闻”环节暂空。<code>generate</code> 只接收材料、不负责抓。上线前接搜索 API（腾讯混元自带联网 / Tavily / Bing）即可让后端自动跑。</li>
+  <li><b>周节奏</b>：文档里的“周一模型精讲 / 周二刻意练习 / 周五刻意练习 / 周日复习”尚未实现，目前只有「学新 + 复习」两条主线。</li>
+  <li><b>前端生成交互</b>：无内容的知识点目前靠手动贴材料，理想是定时自动抓取 → 生成 → 推送。</li>
+</ol>
+
+<h1 seq="auto">安全提醒</h1>
+<ul>
+  <li><code>.env</code> 已加入 <code>.gitignore</code>，不会被提交。</li>
+  <li>若 key 曾在聊天或日志中暴露，建议到 DeepSeek 后台重新生成新 key。</li>
+</ul>
