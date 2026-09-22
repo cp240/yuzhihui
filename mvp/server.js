@@ -212,6 +212,13 @@ const server = http.createServer(async (req, res) => {
 
   try {
     // ---------- API ----------
+    if (route === '/api/knowledge') {
+      // 返回知识点全表，前端 findK 用
+      const map = {};
+      for (const k of KNOWLEDGE) map[k.id] = k;
+      return sendJson(res, 200, map);
+    }
+
     if (route === '/api/state') {
       const state = loadState();
       const props = {};
